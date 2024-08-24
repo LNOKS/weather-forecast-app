@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:intl/intl.dart';
 import 'package:weather_test_task/bloc/weather_bloc.dart';
+import 'package:weather_test_task/models/weather_forecast.dart';
 import 'package:weather_test_task/widgets/animated_background.dart';
 import 'package:weather_test_task/widgets/weather_card.dart';
+import 'package:built_collection/built_collection.dart';
 
 class WeatherScreen extends StatefulWidget {
   @override
@@ -17,6 +20,18 @@ class _WeatherScreenState extends State<WeatherScreen> {
     super.initState();
     _getLocationAndFetchWeather();
   }
+
+  Map<DateTime, List<WeatherDay>> _groupForecastByDate(BuiltList<WeatherDay> days) {
+    return days.fold<Map<DateTime, List<WeatherDay>>>({}, (map, day) {
+      final date = DateTime(day.date.year, day.date.month, day.date.day);
+      if (!map.containsKey(date)) {
+        map[date] = [];
+      }
+      map[date]!.add(day);
+      return map;
+    });
+  }
+
 
   Future<void> _getLocationAndFetchWeather() async {
     final permission = await Geolocator.checkPermission();
@@ -59,6 +74,8 @@ class _WeatherScreenState extends State<WeatherScreen> {
               if (state is WeatherLoading) {
                 return Center(child: CircularProgressIndicator(color: Colors.white));
               } else if (state is WeatherLoaded) {
+                final groupedData = _groupForecastByDate(state.forecast.days);
+
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -71,10 +88,26 @@ class _WeatherScreenState extends State<WeatherScreen> {
                     ),
                     Expanded(
                       child: ListView.builder(
-                        itemCount: state.forecast.days.length,
+                        itemCount: groupedData.keys.length,
                         itemBuilder: (context, index) {
-                          final day = state.forecast.days[index];
-                          return WeatherCard(day: day, index: index);
+                          final date = groupedData.keys.elementAt(index);
+                          final weatherDays = groupedData[date]!;
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                                child: Text(
+                                  DateFormat('EEEE, MMM d').format(date),
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
+                              ),
+                              Column(
+                                children: weatherDays.map((day) => WeatherCard(day: day, index: index)).toList(),
+                              ),
+                            ],
+                          );
                         },
                       ),
                     ),
